@@ -16,16 +16,47 @@ const cors = require("cors");
  */
 
 const server = express();
+const session = require("express-session");
+const KnexSessionStore = require("connect-session-knex")(session);
+
+//would be better to put secret inside of an env file
+//secure should be true but because this is fake and in dev it's cool
+const config = {
+  name: "sessionId",
+  secret: "keep it secret, keep it safe",
+  cookie: {
+    maxAge: 1000 * 60 * 60,
+    secure: false,
+    httpOnly: true,
+  },
+  resave: false,
+  saveUnitialized: false,
+  store: new KnexSessionStore({
+    knex: require("../data/db-config"),
+    tablename: "sessions",
+    sidfieldname: "sid",
+    createTable: true,
+    clearInterval: 1000 * 60 * 60,
+  }),
+};
 
 server.use(helmet());
 server.use(express.json());
 server.use(cors());
+server.use(session(config));
+
+const authRouter = require("./auth/auth-router");
+server.use("/api/auth", authRouter);
+
+const userRouter = require("./users/users-router");
+server.use("/api/users", userRouter);
 
 server.get("/", (req, res) => {
   res.json({ api: "up" });
 });
 
-server.use((err, req, res, next) => { // eslint-disable-line
+server.use((err, req, res) => {
+  // eslint-disable-line
   res.status(err.status || 500).json({
     message: err.message,
     stack: err.stack,
